@@ -54,6 +54,11 @@ GOOGLE_APPLICATION_CREDENTIALS=./.gcs-key.json
 
 ```bash
 uv sync
+
+# 2. Git pre-commit hook 등록 (커밋 시 코드 포맷터/린터 자동 검증용)
+uv run pre-commit install
+
+# 3. 어플리케이션 실행
 uv run main.py
 ```
 
