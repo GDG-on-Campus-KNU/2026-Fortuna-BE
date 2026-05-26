@@ -1,0 +1,66 @@
+from fastapi.testclient import TestClient
+
+from app.core.config import Settings
+from app.core.deps import get_current_user_id
+from main import app
+
+
+def test_health() -> None:
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_invalid_script_option_returns_consistent_error() -> None:
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
+    client = TestClient(app)
+
+    try:
+        response = client.post(
+            "/jobs",
+            data={
+                "duration_minutes": 7,
+                "format": "dialogue",
+                "detail_level": "normal",
+                "voice_style": "friendly",
+                "speed": "normal",
+            },
+            files={"file": ("note.txt", b"content", "text/plain")},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_OPTION"
+
+
+def test_podcast_api_requires_bearer_token() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/jobs",
+        data={
+            "duration_minutes": 10,
+            "format": "dialogue",
+            "detail_level": "normal",
+            "voice_style": "friendly",
+            "speed": "normal",
+        },
+        files={"file": ("note.txt", b"content", "text/plain")},
+    )
+
+    assert response.status_code == 401
+
+
+def test_default_settings_are_safe_for_local_cors_and_gemini() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.gemini_model == "gemini-3.5-flash"
+    assert settings.gemini_tts_model == "gemini-3.1-flash-tts-preview"
+    assert settings.tts_provider == "gemini"
+    assert settings.cors_origin_list == ["*"]
+    assert settings.cors_allow_credentials is False
+    assert Settings(cors_origins="http://localhost:5173", _env_file=None).cors_allow_credentials is True

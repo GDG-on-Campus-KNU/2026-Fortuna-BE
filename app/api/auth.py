@@ -1,49 +1,14 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.database import get_db
-from app.core import security
 from app.models.user import User
-from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate, UserRead, Token
 from app.services.auth_service import AuthService
 
-# Defines the token URL for swagger interactive docs compatibility
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
-
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
-) -> User:
-    """
-    Dependency function that extracts and validates the JWT from incoming request headers.
-    Returns the User model or raises HTTP 401.
-    """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    # Decrypt and decode the token
-    payload = security.decode_access_token(token)
-    if payload is None:
-        raise credentials_exception
-
-    email: str = payload.get("sub")
-    if email is None:
-        raise credentials_exception
-
-    # Verify the user exists in our DB
-    repository = UserRepository(db)
-    user = await repository.get_by_email(email)
-    if user is None:
-        raise credentials_exception
-
-    return user
 
 
 @router.post(
