@@ -1,0 +1,14 @@
+from typing import Protocol
+
+
+class JobRepository(Protocol):
+    def save_job(self, record: dict) -> dict: ...
+
+    def update_job(
+        self, job_id: str, user_id: str | None, changes: dict
+    ) -> dict | None: ...
+
+    def get_job(self, job_id: str, user_id: str | None = None) -> dict | None: ...
+
+    def list_jobs(self, user_id: str) -> list[dict]: ...
+

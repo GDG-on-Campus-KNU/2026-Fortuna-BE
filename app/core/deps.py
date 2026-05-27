@@ -62,8 +62,10 @@ def get_current_user_id(current_user: User = Depends(get_current_user)) -> str:
 
 
 def get_static_audio_dir() -> Path | None:
-    storage = get_storage_service()
-    if isinstance(storage, LocalStorageService):
+    settings = get_settings()
+    if settings.storage_backend == "local":
+        storage = LocalStorageService(settings)
+        storage.ensure_directories()
         return storage.audio_dir
     return None
 
@@ -119,7 +121,10 @@ def get_audio_service() -> AudioGenerationService:
 
 
 def get_content_service() -> ContentService:
-    return ContentService(repository=get_metadata_repository())
+    return ContentService(
+        repository=get_metadata_repository(),
+        audio_url_resolver=get_storage_service(),
+    )
 
 
 def get_job_service() -> JobService:

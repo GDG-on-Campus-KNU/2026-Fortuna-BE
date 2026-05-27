@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -31,9 +32,15 @@ class AuthService:
         hashed_password = security.hash_password(user_in.password)
 
         # Create and persist user
-        new_user = await self.repository.create(
-            email=user_in.email, hashed_password=hashed_password
-        )
+        try:
+            new_user = await self.repository.create(
+                email=user_in.email, hashed_password=hashed_password
+            )
+        except IntegrityError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            ) from exc
         return new_user
 
     async def authenticate_user(self, email: str, plain_password: str) -> User:
