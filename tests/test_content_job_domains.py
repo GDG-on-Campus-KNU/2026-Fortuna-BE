@@ -139,6 +139,42 @@ def test_content_service_assembles_audio_content(tmp_path) -> None:
     assert content["metadata"]["tts"]["speed"] == "normal"
 
 
+def test_content_service_refreshes_audio_url_from_storage_uri(tmp_path) -> None:
+    class FakeAudioUrlResolver:
+        def resolve_audio_url(self, storage_uri: str, fallback_url: str) -> str:
+            assert storage_uri == "gs://bucket/audio/user_1/audio_1.wav"
+            assert fallback_url == "expired-url"
+            return "fresh-signed-url"
+
+    metadata = JsonMetadataRepository(tmp_path / "metadata")
+    user_id = "user_1"
+    metadata.save_file({"file_id": "file_1", "user_id": user_id, "filename": "note.txt"})
+    metadata.save_script(
+        {
+            "script_id": "script_1",
+            "user_id": user_id,
+            "file_id": "file_1",
+            "script": "Generated script",
+            "metadata": {},
+        }
+    )
+    metadata.save_audio(
+        {
+            "audio_id": "audio_1",
+            "user_id": user_id,
+            "script_id": "script_1",
+            "audio_url": "expired-url",
+            "storage_uri": "gs://bucket/audio/user_1/audio_1.wav",
+            "created_at": "2026-05-25T00:00:00+00:00",
+        }
+    )
+    service = ContentService(metadata, audio_url_resolver=FakeAudioUrlResolver())
+
+    content = service.get_content(user_id, "audio_1")
+
+    assert content["audio_url"] == "fresh-signed-url"
+
+
 def test_job_status_transitions(tmp_path) -> None:
     metadata = JsonMetadataRepository(tmp_path / "metadata")
     service = JobService(metadata)

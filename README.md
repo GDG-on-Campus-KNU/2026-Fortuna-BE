@@ -1,116 +1,151 @@
 # Fortuna Backend API
 
-Fortuna 프로젝트의 백엔드 API 서버입니다.  
-이 프로젝트는 **FastAPI**, **SQLAlchemy 2.0 (Async)** 및 **PostgreSQL**을 기반으로 하며, 보안성 높은 사용자 가입, 로그인 및 세션 관리 기능을 지원합니다.
+FastAPI 기반 백엔드입니다. 현재 구현된 주요 범위는 인증, 파일 업로드, GCS 저장, PostgreSQL metadata 저장, job 접수입니다.
 
----
+## Stack
 
-## 🛠️ Tech Stack & Security Features
+- FastAPI
+- SQLAlchemy 2.0
+- PostgreSQL
+- Google Cloud Storage
+- Gemini / Google Cloud TTS 연동 준비
+- uv
+- Docker Compose
 
-* **Core Framework**: FastAPI
-* **Database**: PostgreSQL (asynchronous connection via `asyncpg`)
-* **ORM**: SQLAlchemy 2.0 (Modern declarative mapped format)
-* **Dependency Manager**: [uv](https://github.com/astral-sh/uv)
-* **Security**:
-  * **bcrypt**: 일방향 패스워드 해싱 및 솔팅
-  * **PyJWT**: 비상태성(stateless) 유저 세션 인증 처리 (Bearer JWT)
-  * **UUIDv4 Primary Keys**: 유저 ID 유추 및 데이터 덤프 방지
+## Environment Files
 
----
+실제 실행 파일은 직접 만들고, 예시 파일만 git에 올립니다.
 
-## 🚀 Quick Start & Database Setup
+- Local Python 실행: `.env.example`을 복사해 `.env` 생성
+- Docker Compose 실행: `.env.docker.example`을 복사해 `.env.docker` 생성
 
-프로젝트 구동에 앞서 데이터베이스 서버 가동 및 환경변수 설정이 필요합니다.
-
-### 1. 데이터베이스(PostgreSQL) 서버 가동하기
-
-#### 옵션 A: Docker를 사용하는 방법 (권장 🐳)
-Docker 데몬이 구동 중인 상태에서 아래 명령어를 터미널에 복사해 실행합니다:
 ```bash
-docker run --name fortuna-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=fortuna \
-  -p 5432:5432 \
-  -d postgres:16-alpine
+cp .env.example .env
+cp .env.docker.example .env.docker
 ```
 
-#### 옵션 B: Homebrew 로컬 설치 방식 (macOS 🍺)
-Homebrew를 사용하여 컴퓨터에 직접 설치하는 경우 아래 순서대로 수행합니다:
-```bash
-# 1. PostgreSQL 설치
-brew install postgresql@16
+다음 파일은 절대 git에 올리지 않습니다.
 
-# 2. 백그라운드 서비스 실행
-brew services start postgresql@16
+- `.env`
+- `.env.docker`
+- `.gcs-key.json`
 
-# 3. 프로젝트용 데이터베이스 생성
-createdb fortuna
-```
+## Local Run
 
----
-
-### 2. 환경 변수 설정 (`.env`)
-
-프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 구동하고자 하는 DB 설정에 맞추어 변수를 작성합니다.
+`.env`에서 필요한 값을 채웁니다.
 
 ```env
-# 1. Docker(옵션 A)를 사용하는 경우의 DATABASE_URL (기본 설정)
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/fortuna
-
-# 2. Homebrew(옵션 B) 혹은 로컬 직접 설치를 사용하는 경우의 DATABASE_URL
-# (계정명 'huigyun-jeong' 자리에 본인의 macOS 유저명을 입력해야 합니다.)
-# DATABASE_URL=postgresql+asyncpg://huigyun-jeong@localhost:5432/fortuna
-
-# 보안을 위해 반드시 유니크한 비밀키로 변경해주세요. (openssl rand -hex 32 등으로 생성 가능)
-JWT_SECRET_KEY=94c16a1c8651079541a774dbba22cb33be8ebc7f9994c65e8a5b29381c8ee90d
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+DATABASE_URL=postgresql://fortuna_user:change_me@localhost:5432/fortuna
+JWT_SECRET_KEY=replace-with-a-generated-secret
+GEMINI_API_KEY=
+STORAGE_BACKEND=local
+METADATA_BACKEND=json
 ```
 
----
+GCS를 로컬 Python 실행에서 사용할 때:
 
-### 3. 패키지 설치 및 실행
+```env
+STORAGE_BACKEND=gcs
+GCS_BUCKET_NAME=replace-with-your-gcs-bucket
+GOOGLE_APPLICATION_CREDENTIALS=./.gcs-key.json
+```
 
-프로젝트는 패키지 관리자로 `uv`를 사용합니다.
+실행:
 
 ```bash
-# 1. 의존성 설치
 uv sync
-
-# 2. 어플리케이션 실행
 uv run main.py
 ```
-> **팁**: 어플리케이션이 처음 구동될 때, 데이터베이스에 필요한 테이블(`users` 테이블 등)이 없는 경우 자동으로 자동 생성(`lifespan` 이벤트)되므로 별도의 DDL 스크립트를 수동 실행할 필요가 없습니다.
 
----
+## Docker Compose Run
 
-## 🔍 API 테스트 및 문서 확인 (Swagger)
+`.env.docker`에서 필요한 값을 채웁니다.
 
-서버가 켜진 상태에서 아래 링크로 접속하시면 대화형 API 명세서를 확인할 수 있으며 즉석에서 회원가입 및 토큰 발급 테스트가 가능합니다.
+```env
+JWT_SECRET_KEY=replace-with-a-generated-secret
+STORAGE_BACKEND=gcs
+GCS_BUCKET_NAME=replace-with-your-gcs-bucket
+GCS_KEY_FILE=./.gcs-key.json
+COMPOSE_METADATA_BACKEND=postgres
+```
 
-* **API Docs (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-* **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+실행:
 
----
+```bash
+docker compose --env-file .env.docker up --build
+```
 
-## 📁 Project Structure
+확인:
 
-```text
-app/
-├── api/          # API 컨트롤러 및 라우터 정의
-│   ├── auth.py   # 회원가입, 로그인, 내 정보 조회 라우트
-│   └── router.py # 엔드포인트 통합 및 버저닝(v1)
-├── core/         # 어플리케이션 설정, 보안, DB 엔진 구성
-│   ├── config.py
-│   ├── database.py
-│   └── security.py
-├── models/       # SQLAlchemy 데이터베이스 스키마 모델 정의
-│   └── user.py
-├── repositories/ # 데이터베이스 직접 연동(DAO) 레이어
-│   └── user_repository.py
-├── schemas/      # Pydantic 데이터 포맷 정의 및 유효성 검증
-│   └── user.py
-└── services/     # 비즈니스 로직 및 워크플로우 처리
-    └── auth_service.py
+```bash
+docker compose --env-file .env.docker ps
+docker compose --env-file .env.docker exec postgres pg_isready -U postgres -d fortuna
+docker compose --env-file .env.docker exec postgres psql -U postgres -d fortuna -c "\dt"
+```
+
+API:
+
+- Health: http://localhost:8000/health
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+중지:
+
+```bash
+docker compose --env-file .env.docker down
+```
+
+PostgreSQL volume까지 삭제:
+
+```bash
+docker compose --env-file .env.docker down -v
+```
+
+## API Flow
+
+현재 가능한 흐름:
+
+1. `POST /api/v1/auth/signup`
+2. `POST /api/v1/auth/login`
+3. `POST /uploads`
+4. `POST /jobs`
+5. `GET /jobs/{job_id}`
+
+`/jobs`는 현재 파일 업로드와 job metadata 생성을 수행하며, job은 `pending / queued` 상태로 생성됩니다. 대본 생성, TTS, 최종 콘텐츠 생성 worker는 아직 API 흐름에 연결되어 있지 않습니다.
+
+## GCS
+
+GCS storage는 private bucket 기준입니다.
+
+- 원본 파일: `uploads/{user_id}/{file_id}/original.ext`
+- 추출 텍스트: `uploads/{user_id}/{file_id}/extracted.txt`
+- 스크립트 파일: `scripts/{user_id}/{script_id}.json`
+- 오디오 파일: `audio/{user_id}/{audio_id}.wav|mp3`
+
+오디오 URL은 signed URL로 발급됩니다. 만료 시간은 다음 변수로 조정합니다.
+
+```env
+GCS_SIGNED_URL_EXPIRATION_MINUTES=60
+```
+
+## Tests
+
+기본 테스트:
+
+```bash
+uv run python -m pytest -q
+```
+
+실제 PostgreSQL 통합 테스트:
+
+```bash
+POSTGRES_TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/fortuna \
+uv run python -m pytest tests/test_postgres_integration.py -q
+```
+
+PowerShell:
+
+```powershell
+$env:POSTGRES_TEST_DATABASE_URL='postgresql+asyncpg://postgres:postgres@localhost:5432/fortuna'
+uv run python -m pytest tests/test_postgres_integration.py -q
 ```

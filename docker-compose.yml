@@ -1,0 +1,81 @@
+name: fortuna
+
+services:
+  api:
+    build:
+      context: .
+    image: fortuna-api:local
+    init: true
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-docker}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fortuna}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      GEMINI_TTS_MODEL: ${GEMINI_TTS_MODEL:-gemini-3.1-flash-tts-preview}
+      GEMINI_TTS_FRIENDLY_VOICE_NAME: ${GEMINI_TTS_FRIENDLY_VOICE_NAME:-Puck}
+      GEMINI_TTS_PROFESSOR_VOICE_NAME: ${GEMINI_TTS_PROFESSOR_VOICE_NAME:-Kore}
+      GEMINI_TTS_SAMPLE_RATE_HZ: ${GEMINI_TTS_SAMPLE_RATE_HZ:-24000}
+      GEMINI_TTS_CHANNELS: ${GEMINI_TTS_CHANNELS:-1}
+      GEMINI_TTS_SAMPLE_WIDTH: ${GEMINI_TTS_SAMPLE_WIDTH:-2}
+      TTS_PROVIDER: ${TTS_PROVIDER:-gemini}
+      GOOGLE_TTS_LANGUAGE_CODE: ${GOOGLE_TTS_LANGUAGE_CODE:-ko-KR}
+      GOOGLE_TTS_VOICE_NAME: ${GOOGLE_TTS_VOICE_NAME:-}
+      GOOGLE_TTS_AUDIO_ENCODING: ${GOOGLE_TTS_AUDIO_ENCODING:-MP3}
+      GOOGLE_TTS_SPEAKING_RATE: ${GOOGLE_TTS_SPEAKING_RATE:-1.0}
+      GOOGLE_TTS_PITCH: ${GOOGLE_TTS_PITCH:-0.0}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_DIR: /app/storage
+      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-}
+      GCS_SIGNED_URL_EXPIRATION_MINUTES: ${GCS_SIGNED_URL_EXPIRATION_MINUTES:-60}
+      METADATA_BACKEND: ${COMPOSE_METADATA_BACKEND:-postgres}
+      METADATA_DIR: /app/storage/metadata
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-/run/secrets/gcs-key.json}
+    volumes:
+      - ./storage:/app/storage
+      - ${GCS_KEY_FILE:-./.gcs-key.json}:/run/secrets/gcs-key.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-fortuna}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-fortuna}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
