@@ -67,7 +67,7 @@ def test_metadata_repository_contract(repository: MetadataRepository) -> None:
         "user_id": user_id,
         "file_id": "file_1",
         "script": "Generated script",
-        "metadata": {"duration_minutes": 10, "format": "dialogue"},
+        "metadata": {"duration_minutes": 10, "format": "summary"},
         "prompt_chars": 123,
         "storage_uri": "local://scripts/user_1/script_1.json",
         "created_at": "2026-05-25T00:01:00+00:00",

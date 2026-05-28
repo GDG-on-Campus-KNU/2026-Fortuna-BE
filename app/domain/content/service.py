@@ -69,7 +69,6 @@ class ContentService:
 
         return {
             "content_id": audio_id,
-            "audio_id": audio_id,
             "script_id": script_id,
             "file_id": file_id,
             "filename": file_record.get("filename", ""),

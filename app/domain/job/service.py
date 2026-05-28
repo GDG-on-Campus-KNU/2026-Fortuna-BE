@@ -11,6 +11,38 @@ class JobService:
     def __init__(self, repository: JobRepository) -> None:
         self.repository = repository
 
+    def create_job_for_file(
+        self,
+        user_id: str,
+        file_id: str,
+        duration_minutes: DurationMinutes,
+        script_format: ScriptFormat,
+        detail_level: DetailLevel,
+        voice_style: VoiceStyle,
+        speed: SpeechSpeed,
+    ) -> dict:
+        file_record = self.repository.get_file(file_id, user_id)
+        if file_record is None:
+            raise AppError(
+                "FILE_NOT_FOUND",
+                "Uploaded file was not found.",
+                status_code=404,
+                detail={"file_id": file_id},
+            )
+        return self.create_job(
+            user_id=user_id,
+            file_id=file_id,
+            filename=file_record["filename"],
+            content_type=file_record["content_type"],
+            file_size=file_record["size"],
+            extracted_text_chars=file_record["extracted_text_chars"],
+            duration_minutes=duration_minutes,
+            script_format=script_format,
+            detail_level=detail_level,
+            voice_style=voice_style,
+            speed=speed,
+        )
+
     def create_job(
         self,
         user_id: str,
@@ -111,4 +143,3 @@ class JobService:
                 detail={"job_id": job_id},
             )
         return job
-

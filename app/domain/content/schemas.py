@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 DurationMinutes = Literal[5, 10, 20]
-ScriptFormat = Literal["dialogue", "quiz"]
+ScriptFormat = Literal["summary"]
 DetailLevel = Literal["brief", "normal", "detailed"]
 
 
@@ -26,7 +26,6 @@ class ScriptGenerateResponse(BaseModel):
 
 class ContentListItem(BaseModel):
     content_id: str
-    audio_id: str
     script_id: str
     file_id: str
     filename: str
@@ -37,4 +36,3 @@ class ContentListItem(BaseModel):
 
 class ContentResponse(ContentListItem):
     script: str
-

@@ -1,7 +1,12 @@
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
-from app.core.deps import get_current_user_id, get_job_service, get_source_service
+from app.core.deps import (
+    get_content_job_processor,
+    get_current_user_id,
+    get_job_service,
+    get_source_service,
+)
 from app.domain.content.service import ContentService
 from app.domain.job.service import JobService
 from app.domain.source.service import SourceService
@@ -9,6 +14,11 @@ from app.infra.pdf.extractor import PDFExtractor
 from app.infra.repositories.json_repo import JsonMetadataRepository
 from app.infra.storage.local import LocalStorageService
 from main import app
+
+
+class NoopContentJobProcessor:
+    def process(self, user_id: str, job_id: str) -> None:
+        return None
 
 
 def test_job_create_and_lookup(tmp_path) -> None:
@@ -29,19 +39,27 @@ def test_job_create_and_lookup(tmp_path) -> None:
     app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
     app.dependency_overrides[get_job_service] = lambda: JobService(metadata)
     app.dependency_overrides[get_source_service] = lambda: source_service
+    app.dependency_overrides[get_content_job_processor] = lambda: NoopContentJobProcessor()
     client = TestClient(app)
 
     try:
+        upload = client.post(
+            "/uploads",
+            files={"file": ("note.txt", b"content", "text/plain")},
+        )
+        assert upload.status_code == 200
+        file_id = upload.json()["file_id"]
+
         response = client.post(
             "/jobs",
-            data={
+            json={
+                "file_id": file_id,
                 "duration_minutes": 10,
-                "format": "dialogue",
+                "format": "summary",
                 "detail_level": "normal",
                 "voice_style": "friendly",
                 "speed": "normal",
             },
-            files={"file": ("note.txt", b"content", "text/plain")},
         )
 
         assert response.status_code == 202
@@ -55,7 +73,7 @@ def test_job_create_and_lookup(tmp_path) -> None:
 
         assert lookup.status_code == 200
         assert lookup.json()["job_id"] == created["job_id"]
-        assert lookup.json()["input"]["file_id"] == created["input"]["file_id"]
+        assert lookup.json()["input"]["file_id"] == file_id
         job_record = metadata.get_job(created["job_id"], "test-user-id")
         file_id = job_record["input"]["file_id"]
         assert metadata.get_file(file_id, "test-user-id")["filename"] == "note.txt"
@@ -65,40 +83,28 @@ def test_job_create_and_lookup(tmp_path) -> None:
         app.dependency_overrides.clear()
 
 
-def test_job_rejects_invalid_file_type(tmp_path) -> None:
+def test_job_rejects_unknown_file_id(tmp_path) -> None:
     metadata = JsonMetadataRepository(tmp_path / "metadata")
-    settings = Settings(
-        app_env="test",
-        local_storage_dir=str(tmp_path / "storage"),
-        metadata_dir=str(tmp_path / "metadata"),
-        _env_file=None,
-    )
-    source_service = SourceService(
-        settings=settings,
-        storage=LocalStorageService(settings),
-        repository=metadata,
-        text_extractor=PDFExtractor(),
-    )
     app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
     app.dependency_overrides[get_job_service] = lambda: JobService(metadata)
-    app.dependency_overrides[get_source_service] = lambda: source_service
+    app.dependency_overrides[get_content_job_processor] = lambda: NoopContentJobProcessor()
     client = TestClient(app)
 
     try:
         response = client.post(
             "/jobs",
-            data={
+            json={
+                "file_id": "file_missing",
                 "duration_minutes": 10,
-                "format": "dialogue",
+                "format": "summary",
                 "detail_level": "normal",
                 "voice_style": "friendly",
                 "speed": "normal",
             },
-            files={"file": ("image.png", b"png", "image/png")},
         )
 
-        assert response.status_code == 400
-        assert response.json()["error"]["code"] == "INVALID_FILE_TYPE"
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "FILE_NOT_FOUND"
         assert metadata.list_jobs("test-user-id") == []
     finally:
         app.dependency_overrides.clear()
@@ -186,7 +192,7 @@ def test_job_status_transitions(tmp_path) -> None:
         file_size=12,
         extracted_text_chars=12,
         duration_minutes=10,
-        script_format="dialogue",
+        script_format="summary",
         detail_level="normal",
         voice_style="friendly",
         speed="normal",
@@ -215,7 +221,7 @@ def test_job_failed_transition(tmp_path) -> None:
         file_size=12,
         extracted_text_chars=12,
         duration_minutes=10,
-        script_format="dialogue",
+        script_format="summary",
         detail_level="normal",
         voice_style="friendly",
         speed="normal",
@@ -226,3 +232,75 @@ def test_job_failed_transition(tmp_path) -> None:
     assert failed["status"] == "failed"
     assert failed["step"] == "rendering_audio"
     assert failed["error"] == "TTS failed"
+
+
+def test_content_job_processor_completes_job(tmp_path) -> None:
+    class FakeScriptService:
+        def generate_script(
+            self,
+            user_id: str,
+            file_id: str,
+            duration_minutes: int,
+            script_format: str,
+            detail_level: str,
+        ) -> dict:
+            assert user_id == "user_1"
+            assert file_id == "file_1"
+            assert duration_minutes == 10
+            assert script_format == "summary"
+            assert detail_level == "normal"
+            return {"script_id": "script_1", "script": "Generated summary script"}
+
+    class FakeAudioService:
+        def generate_audio(
+            self,
+            user_id: str,
+            script_id: str,
+            voice_style: str,
+            speed: str,
+        ) -> dict:
+            assert user_id == "user_1"
+            assert script_id == "script_1"
+            assert voice_style == "friendly"
+            assert speed == "normal"
+            return {"audio_id": "audio_1", "audio_url": "/static/audio/audio_1.wav"}
+
+    from app.application.content_job_processor import ContentJobProcessor
+
+    metadata = JsonMetadataRepository(tmp_path / "metadata")
+    metadata.save_file(
+        {
+            "file_id": "file_1",
+            "user_id": "user_1",
+            "filename": "note.txt",
+            "content_type": "text/plain",
+            "size": 12,
+            "storage_uri": "local://uploads/user_1/file_1/original.txt",
+            "extracted_text_uri": "local://uploads/user_1/file_1/extracted.txt",
+            "extracted_text_chars": 12,
+            "created_at": "2026-05-25T00:00:00+00:00",
+        }
+    )
+    job_service = JobService(metadata)
+    job = job_service.create_job_for_file(
+        user_id="user_1",
+        file_id="file_1",
+        duration_minutes=10,
+        script_format="summary",
+        detail_level="normal",
+        voice_style="friendly",
+        speed="normal",
+    )
+    processor = ContentJobProcessor(
+        job_service=job_service,
+        script_service=FakeScriptService(),
+        audio_service=FakeAudioService(),
+    )
+
+    processor.process("user_1", job["job_id"])
+
+    completed = metadata.get_job(job["job_id"], "user_1")
+    assert completed["status"] == "done"
+    assert completed["step"] == "completed"
+    assert completed["progress"] == 100
+    assert completed["content_id"] == "audio_1"

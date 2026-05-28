@@ -2,8 +2,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.domain.audio.schemas import SpeechSpeed, VoiceStyle
+from app.domain.content.schemas import DetailLevel, DurationMinutes, ScriptFormat
+
 
 JobStatus = Literal["pending", "running", "done", "failed"]
+
+
+class JobCreateRequest(BaseModel):
+    file_id: str
+    duration_minutes: DurationMinutes = 10
+    format: ScriptFormat = "summary"
+    detail_level: DetailLevel = "normal"
+    voice_style: VoiceStyle = "friendly"
+    speed: SpeechSpeed = "normal"
 
 
 class JobResponse(BaseModel):
@@ -16,4 +28,3 @@ class JobResponse(BaseModel):
     input: dict[str, Any]
     created_at: str
     updated_at: str
-
