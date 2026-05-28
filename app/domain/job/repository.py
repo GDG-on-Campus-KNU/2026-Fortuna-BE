@@ -2,6 +2,8 @@ from typing import Protocol
 
 
 class JobRepository(Protocol):
+    def get_file(self, file_id: str, user_id: str | None = None) -> dict | None: ...
+
     def save_job(self, record: dict) -> dict: ...
 
     def update_job(
@@ -11,4 +13,3 @@ class JobRepository(Protocol):
     def get_job(self, job_id: str, user_id: str | None = None) -> dict | None: ...
 
     def list_jobs(self, user_id: str) -> list[dict]: ...
-

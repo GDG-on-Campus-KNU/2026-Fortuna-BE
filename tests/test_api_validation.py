@@ -24,14 +24,14 @@ def test_invalid_script_option_returns_consistent_error() -> None:
     try:
         response = client.post(
             "/jobs",
-            data={
+            json={
+                "file_id": "file_1",
                 "duration_minutes": 7,
-                "format": "dialogue",
+                "format": "summary",
                 "detail_level": "normal",
                 "voice_style": "friendly",
                 "speed": "normal",
             },
-            files={"file": ("note.txt", b"content", "text/plain")},
         )
     finally:
         app.dependency_overrides.clear()
@@ -45,14 +45,14 @@ def test_podcast_api_requires_bearer_token() -> None:
 
     response = client.post(
         "/jobs",
-        data={
+        json={
+            "file_id": "file_1",
             "duration_minutes": 10,
-            "format": "dialogue",
+            "format": "summary",
             "detail_level": "normal",
             "voice_style": "friendly",
             "speed": "normal",
         },
-        files={"file": ("note.txt", b"content", "text/plain")},
     )
 
     assert response.status_code == 401

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import Depends
 
+from app.application.content_job_processor import ContentJobProcessor
 from app.application.generate_content import AudioGenerationService, ScriptGenerationService
 from app.core.auth import get_current_user
 from app.core.config import get_settings
@@ -129,6 +130,14 @@ def get_content_service() -> ContentService:
 
 def get_job_service() -> JobService:
     return JobService(repository=get_metadata_repository())
+
+
+def get_content_job_processor() -> ContentJobProcessor:
+    return ContentJobProcessor(
+        job_service=get_job_service(),
+        script_service=get_script_service(),
+        audio_service=get_audio_service(),
+    )
 
 
 def reset_dependency_caches() -> None:
