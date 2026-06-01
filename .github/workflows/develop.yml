@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 defaults:
@@ -27,6 +27,33 @@ jobs:
     name: CI
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      APP_ENV: test
+      # Hermetic CI values (NOT secrets). create_app() validates that
+      # JWT_SECRET_KEY/DATABASE_URL are non-empty and not placeholders, so the
+      # import smoke step needs real-looking values even though no DB is hit.
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+      JWT_SECRET_KEY: ci-test-secret-not-a-placeholder
+      METADATA_BACKEND: json
+      STORAGE_BACKEND: local
+      # Real Postgres from the service container below; runs the otherwise-skipped
+      # integration test (tests/test_postgres_integration.py).
+      POSTGRES_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -38,10 +65,16 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        run: python -m pip install --upgrade uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Sync dependencies
         run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
 
       - name: Check Python syntax
         run: uv run python -m compileall main.py app
@@ -49,14 +82,164 @@ jobs:
       - name: Verify FastAPI app import
         run: uv run python -c "from main import app; assert app.title == 'Fortuna API'; print(app.title)"
 
-  # cd:
-  #   name: CD
-  #   needs: ci
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #
-  #   steps:
-  #     - name: Trigger Render deploy
-  #       run: curl "$RENDER_DEPLOY_HOOK_URL"
-  #       env:
-  #         RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      - name: Run tests
+        run: uv run python -m pytest -q
+
+  docker:
+    name: Docker build + boot smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_url: ${{ steps.publish.outputs.image_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Image metadata
+        id: image
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image_ref="ghcr.io/${owner}/fortuna-api"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+          echo "image_tag=${image_ref}:${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg GIT_COMMIT="${GITHUB_SHA}" \
+            -t "${{ steps.image.outputs.image_tag }}" \
+            .
+
+      # `docker build` alone never starts the app. The lifespan runs create_all
+      # against DATABASE_URL and the container CMD/$PORT/non-root user only run at
+      # runtime, so boot the image against a throwaway Postgres and wait for /health.
+      - name: Boot smoke test
+        run: |
+          docker network create ci-smoke
+          docker run -d --name ci-pg --network ci-smoke \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres \
+            postgres:16-alpine >/dev/null
+          echo "Waiting for Postgres..."
+          for i in $(seq 1 30); do
+            if docker exec ci-pg pg_isready -U postgres >/dev/null 2>&1; then
+              echo "Postgres ready"; break
+            fi
+            sleep 2
+          done
+          docker run -d --name ci-app --network ci-smoke -p 8000:8000 \
+            -e DATABASE_URL=postgresql+asyncpg://postgres:postgres@ci-pg:5432/postgres \
+            -e JWT_SECRET_KEY=ci-test-secret-not-a-placeholder \
+            -e STORAGE_BACKEND=local \
+            -e METADATA_BACKEND=postgres \
+            "${{ steps.image.outputs.image_tag }}" >/dev/null
+          echo "Waiting for /health..."
+          ok=""
+          for i in $(seq 1 30); do
+            body="$(curl -fsS --max-time 5 http://localhost:8000/health 2>/dev/null || true)"
+            status="$(printf '%s' "${body}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)"
+            echo "  attempt ${i}: status=${status:-<unreachable>}"
+            if [ "${status}" = "ok" ]; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "${ok}" ]; then
+            echo "::error::App container did not become healthy."
+            echo "----- ci-app logs -----"; docker logs ci-app || true
+            exit 1
+          fi
+          echo "Boot smoke passed."
+
+      - name: Tear down smoke containers
+        if: always()
+        run: |
+          docker rm -f ci-app ci-pg >/dev/null 2>&1 || true
+          docker network rm ci-smoke >/dev/null 2>&1 || true
+
+      - name: Login to GitHub Container Registry
+        if: >-
+          github.event_name == 'push'
+          && github.ref == 'refs/heads/main'
+          && vars.ENABLE_CD == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push verified image
+        id: publish
+        if: >-
+          github.event_name == 'push'
+          && github.ref == 'refs/heads/main'
+          && vars.ENABLE_CD == 'true'
+        run: |
+          image_tag="${{ steps.image.outputs.image_tag }}"
+          image_ref="${{ steps.image.outputs.image_ref }}"
+          docker push "${image_tag}"
+          digest="$(docker buildx imagetools inspect "${image_tag}" --format '{{.Manifest.Digest}}')"
+          image_url="${image_ref}@${digest}"
+          echo "image_url=${image_url}" >> "${GITHUB_OUTPUT}"
+          echo "Published ${image_url}"
+
+  cd:
+    name: CD (Render)
+    needs: [ci, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # CD is opt-in: set repository variable ENABLE_CD=true to turn it on.
+    # While ENABLE_CD != 'true' this job is skipped (intentionally disabled).
+    # This deploys the exact image digest built and smoke-tested by the docker job.
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && vars.ENABLE_CD == 'true'
+    steps:
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          IMAGE_URL: ${{ needs.docker.outputs.image_url }}
+        run: |
+          if [ -z "${RENDER_DEPLOY_HOOK_URL}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL is not set but CD is enabled (ENABLE_CD=true)."
+            exit 1
+          fi
+          if [ -z "${IMAGE_URL}" ]; then
+            echo "::error::Docker image was not published; cannot deploy a verified image."
+            exit 1
+          fi
+          encoded_image="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["IMAGE_URL"], safe=""))')"
+          separator="?"
+          if [[ "${RENDER_DEPLOY_HOOK_URL}" == *"?"* ]]; then
+            separator="&"
+          fi
+          curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}${separator}imgURL=${encoded_image}"
+
+      # Verifies the NEW revision is live by matching /health's commit to this SHA.
+      # For image-backed services this comes from the GIT_COMMIT build arg baked
+      # into the verified image. JSON parsed with stdlib python3 (no jq).
+      - name: Verify deploy is live (/health commit)
+        env:
+          SERVICE_URL: ${{ vars.RENDER_SERVICE_URL }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "${SERVICE_URL}" ]; then
+            echo "::error::RENDER_SERVICE_URL variable is not set; cannot verify the deploy."
+            exit 1
+          fi
+          url="${SERVICE_URL%/}/health"
+          echo "Waiting for ${url} to report commit ${EXPECTED_SHA} ..."
+          deadline=$(( SECONDS + 600 ))
+          while [ "${SECONDS}" -lt "${deadline}" ]; do
+            body="$(curl -fsS --max-time 10 "${url}" 2>/dev/null || true)"
+            commit="$(printf '%s' "${body}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit",""))' 2>/dev/null || true)"
+            echo "  current=${commit:-<unreachable>}"
+            if [ "${commit}" = "${EXPECTED_SHA}" ]; then
+              echo "Deploy verified: ${commit} is live."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Timed out waiting for ${EXPECTED_SHA} to become live at ${url}. Check that the Render service deploys the requested imgURL and that the image was built with GIT_COMMIT."
+          exit 1
