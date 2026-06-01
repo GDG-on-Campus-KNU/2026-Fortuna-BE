@@ -15,10 +15,10 @@ __pycache__
 .env.*
 !.env.example
 !.env.docker.example
-.gcs-key.json
+.gcs-key*.json
 
 .secrets
-storage
+storage/
 htmlcov
 dist
 build
