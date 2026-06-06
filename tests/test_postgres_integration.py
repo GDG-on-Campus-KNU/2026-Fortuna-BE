@@ -114,6 +114,7 @@ def test_postgres_auth_and_metadata_share_fresh_database_path() -> None:
             "metadata_scripts",
             "metadata_audio",
             "metadata_jobs",
+            "metadata_notebooks",
         }.issubset(tables)
     finally:
         if metadata_engine is not None:
