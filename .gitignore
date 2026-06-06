@@ -260,4 +260,4 @@ $RECYCLE.BIN/
 # gcs key
 .gcs-key*.json
 gcs-test.txt
-storage/
+/storage/

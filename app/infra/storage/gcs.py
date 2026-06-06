@@ -151,14 +151,37 @@ class GCSStorageService:
             ) from exc
         return blob
 
+    def _get_service_account_email(self) -> str | None:
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
+                headers={"Metadata-Flavor": "Google"}
+            )
+            with urllib.request.urlopen(req, timeout=2) as response:
+                return response.read().decode("utf-8").strip()
+        except Exception:
+            return None
+
     def _signed_read_url(self, blob: storage.Blob) -> str:
         try:
+            email = self._get_service_account_email()
+            kwargs = {}
+            if email:
+                kwargs["service_account_email"] = email
+                from google.auth.compute_engine.credentials import Credentials as ComputeCredentials
+                from google.auth.transport.requests import Request
+                creds = ComputeCredentials(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+                creds.refresh(Request())
+                if creds.token:
+                    kwargs["access_token"] = creds.token
             return blob.generate_signed_url(
                 version="v4",
                 expiration=timedelta(
                     minutes=self.settings.gcs_signed_url_expiration_minutes
                 ),
                 method="GET",
+                **kwargs
             )
         except (GoogleAPIError, GoogleAuthError, AttributeError, ValueError) as exc:
             raise AppError(
