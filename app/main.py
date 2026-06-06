@@ -5,11 +5,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import contents, health, jobs, uploads
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.deps import get_static_audio_dir
 from app.core.errors import register_exception_handlers
+
 
 
 @asynccontextmanager
@@ -43,10 +43,6 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(application)
-    application.include_router(health.router)
-    application.include_router(uploads.router)
-    application.include_router(jobs.router)
-    application.include_router(contents.router)
     application.include_router(api_router, prefix="/api/v1")
 
     audio_dir = get_static_audio_dir()
