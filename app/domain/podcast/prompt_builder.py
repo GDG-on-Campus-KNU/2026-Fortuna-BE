@@ -1,4 +1,4 @@
-from app.domain.content.schemas import DetailLevel, DurationMinutes, ScriptFormat
+from app.domain.podcast.schemas import DetailLevel, DurationMinutes, ScriptFormat
 
 
 class PromptBuilder:

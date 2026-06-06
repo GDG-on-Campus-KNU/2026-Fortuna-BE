@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from app.domain.audio.schemas import SpeechSpeed, VoiceStyle
-from app.domain.content.schemas import DetailLevel, DurationMinutes, ScriptFormat
+from app.domain.podcast.schemas import DetailLevel, DurationMinutes, ScriptFormat
 
 
 JobStatus = Literal["pending", "running", "done", "failed"]
@@ -11,6 +11,7 @@ JobStatus = Literal["pending", "running", "done", "failed"]
 
 class JobCreateRequest(BaseModel):
     file_id: str
+    notebook_id: str
     duration_minutes: DurationMinutes = 10
     format: ScriptFormat = "summary"
     detail_level: DetailLevel = "normal"

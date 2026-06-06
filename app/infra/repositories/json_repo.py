@@ -117,3 +117,28 @@ class JsonMetadataRepository:
     def list_jobs(self, user_id: str) -> list[dict]:
         return self._filter_user(list(self._load("jobs").values()), user_id)
 
+    def save_notebook(self, record: dict) -> dict:
+        return self._upsert("notebooks", "notebook_id", record)
+
+    def get_notebook(self, notebook_id: str, user_id: str | None = None) -> dict | None:
+        return self._get_scoped("notebooks", notebook_id, user_id)
+
+    def list_notebooks(self, user_id: str) -> list[dict]:
+        return self._filter_user(list(self._load("notebooks").values()), user_id)
+
+    def delete_notebook(self, notebook_id: str, user_id: str) -> None:
+        self._delete("notebooks", "notebook_id", notebook_id, user_id)
+
+    def delete_audio(self, audio_id: str, user_id: str) -> None:
+        self._delete("audio", "audio_id", audio_id, user_id)
+
+    def _delete(self, collection: str, key: str, key_value: str, user_id: str) -> None:
+        with self._lock:
+            payload = self._load(collection)
+            record = payload.get(key_value)
+            if record is not None:
+                if record.get("user_id") == user_id:
+                    del payload[key_value]
+                    self._save(collection, payload)
+
+

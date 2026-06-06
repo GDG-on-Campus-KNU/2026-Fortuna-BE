@@ -9,6 +9,7 @@ from sqlalchemy import (
     String,
     Table,
     create_engine,
+    delete,
     func,
     insert,
     select,
@@ -86,11 +87,29 @@ jobs = Table(
 )
 
 
+notebooks = Table(
+    "metadata_notebooks",
+    metadata,
+    Column("notebook_id", String(128), primary_key=True),
+    Column("user_id", String(128), nullable=False),
+    Column("record", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    Index("ix_metadata_notebooks_user_id", "user_id"),
+)
+
+
 TABLES: dict[str, tuple[Table, str]] = {
     "files": (files, "file_id"),
     "scripts": (scripts, "script_id"),
     "audio": (audio, "audio_id"),
     "jobs": (jobs, "job_id"),
+    "notebooks": (notebooks, "notebook_id"),
 }
 
 
@@ -171,6 +190,38 @@ class PostgresMetadataRepository:
 
     def list_jobs(self, user_id: str) -> list[dict]:
         return self._list("jobs", user_id)
+
+    def save_notebook(self, record: dict[str, Any]) -> dict[str, Any]:
+        return self._upsert("notebooks", record)
+
+    def get_notebook(self, notebook_id: str, user_id: str | None = None) -> dict | None:
+        return self._get_scoped("notebooks", notebook_id, user_id)
+
+    def list_notebooks(self, user_id: str) -> list[dict]:
+        return self._list("notebooks", user_id)
+
+    def delete_notebook(self, notebook_id: str, user_id: str) -> None:
+        self._delete("notebooks", notebook_id, user_id)
+
+    def delete_audio(self, audio_id: str, user_id: str) -> None:
+        self._delete("audio", audio_id, user_id)
+
+    def _delete(self, collection: str, key_value: str, user_id: str) -> None:
+        table, key = TABLES[collection]
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    delete(table).where(
+                        (table.c[key] == key_value) & (table.c.user_id == user_id)
+                    )
+                )
+        except SQLAlchemyError as exc:
+            raise AppError(
+                "METADATA_DELETE_FAILED",
+                "Failed to delete metadata.",
+                status_code=500,
+                detail={"collection": collection, "reason": exc.__class__.__name__},
+            ) from exc
 
     def _upsert(self, collection: str, record: dict[str, Any]) -> dict[str, Any]:
         table, key = TABLES[collection]
