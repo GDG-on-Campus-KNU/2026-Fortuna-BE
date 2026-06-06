@@ -1,0 +1,21 @@
+.gcloudignore
+.git
+.gitignore
+
+# Ignore local storage
+/storage/
+
+# Ignore Python cache and environment
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Ignore env keys
+.env
+.env.*
+!.env.example
+!.env.docker.example
+.gcs-key*.json
