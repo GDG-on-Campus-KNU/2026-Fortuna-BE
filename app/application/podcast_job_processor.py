@@ -1,21 +1,24 @@
-from app.application.generate_content import (
+from app.application.generate_podcast import (
     AudioGenerationService,
     ScriptGenerationService,
 )
 from app.core.errors import AppError
 from app.domain.job.service import JobService
+from app.domain.notebook.service import NotebookService
 
 
-class ContentJobProcessor:
+class PodcastJobProcessor:
     def __init__(
         self,
         job_service: JobService,
         script_service: ScriptGenerationService,
         audio_service: AudioGenerationService,
+        notebook_service: NotebookService | None = None,
     ) -> None:
         self.job_service = job_service
         self.script_service = script_service
         self.audio_service = audio_service
+        self.notebook_service = notebook_service
 
     def process(self, user_id: str, job_id: str) -> None:
         step = "queued"
@@ -43,6 +46,9 @@ class ContentJobProcessor:
             )
 
             self.job_service.mark_done(user_id, job_id, audio["audio_id"])
+            notebook_id = job.get("notebook_id")
+            if notebook_id and self.notebook_service:
+                self.notebook_service.add_podcast(user_id, notebook_id, audio["audio_id"])
         except AppError as exc:
             self._mark_failed_safely(
                 user_id,

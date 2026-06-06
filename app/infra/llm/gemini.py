@@ -37,3 +37,25 @@ class GeminiService:
             )
         return script
 
+    def generate_title(self, source_text: str) -> str:
+        if not self.settings.gemini_api_key:
+            return "무제 팟캐스트"
+        try:
+            from google import genai
+
+            client = genai.Client(api_key=self.settings.gemini_api_key)
+            prompt = (
+                "자료 내용을 바탕으로 팟캐스트에 어울리는 짧고 매력적인 한글 제목을 하나 지어줘. "
+                "다른 부연 설명이나 따옴표 없이 오직 제목만 한 줄로 출력해야 해. 자료 내용:\n\n"
+                f"{source_text[:2000]}"
+            )
+            response = client.models.generate_content(
+                model=self.settings.gemini_model,
+                contents=prompt,
+            )
+            title = (response.text or "").strip()
+            # Clean up wrap quotes
+            return title.strip('"').strip("'")
+        except Exception:
+            return ""
+
