@@ -20,7 +20,7 @@ class AudioRenderer:
         self.mixer = mixer
 
     def render(self, script: str, options: AudioRenderOptions) -> AudioAsset:
-        chunks = self._split_script_into_chunks(script, max_words=200)
+        chunks = self._split_script_into_chunks(script, max_words=150)
 
         if not chunks:
             speech = self.speech_synthesizer.synthesize("", options.speech)
@@ -39,7 +39,7 @@ class AudioRenderer:
         music = self.music_generator.generate(options.music)
         return self.mixer.mix(speech, music, options)
 
-    def _split_script_into_chunks(self, script: str, max_words: int = 200) -> list[str]:
+    def _split_script_into_chunks(self, script: str, max_words: int) -> list[str]:
         # Split by sentence terminators followed by spaces, or on newlines
         raw_sentences = re.split(r"(?<=[.!?])\s+|\n+", script)
         sentences = [s.strip() for s in raw_sentences if s.strip()]
