@@ -36,7 +36,7 @@ def create_access_token(
     data: dict[str, Any], expires_delta: Optional[timedelta] = None
 ) -> str:
     """
-    Generates a secure JSON Web Token (JWT).
+    Generates a secure JSON Web Token (JWT) for access.
     """
     to_encode = data.copy()
     if expires_delta:
@@ -46,8 +46,29 @@ def create_access_token(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
-    # Store 'exp' as UTC Unix Timestamp
-    to_encode.update({"exp": expire})
+    # Store 'exp' as UTC Unix Timestamp and verify token type
+    to_encode.update({"exp": expire, "type": "access"})
+    encoded_jwt = jwt.encode(
+        to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
+    return encoded_jwt
+
+
+def create_refresh_token(
+    data: dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
+    """
+    Generates a secure JSON Web Token (JWT) for refresh.
+    """
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+
+    to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(
         to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
     )
@@ -63,6 +84,27 @@ def decode_access_token(token: str) -> Optional[dict[str, Any]]:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
+        # For backward compatibility, allow None/missing type as "access"
+        token_type = payload.get("type")
+        if token_type not in (None, "access"):
+            return None
         return payload
     except jwt.PyJWTError:
         return None
+
+
+def decode_refresh_token(token: str) -> Optional[dict[str, Any]]:
+    """
+    Decodes and validates a JWT refresh token.
+    Returns payload dict if valid, otherwise None.
+    """
+    try:
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
+        if payload.get("type") != "refresh":
+            return None
+        return payload
+    except jwt.PyJWTError:
+        return None
+
