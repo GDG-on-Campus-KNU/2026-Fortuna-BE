@@ -124,3 +124,10 @@ class SourceService:
             )
         return text
 
+    def delete_source(self, user_id: str, file_id: str) -> None:
+        file_record = self.repository.get_file(file_id, user_id)
+        if not file_record:
+            raise AppError("FILE_NOT_FOUND", "Source file not found.", status_code=404)
+        self.storage.delete_upload(user_id, file_id)
+        self.repository.delete_file(file_id, user_id)
+

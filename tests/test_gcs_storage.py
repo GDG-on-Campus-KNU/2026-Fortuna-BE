@@ -41,6 +41,14 @@ class FakeBucket:
             self.blobs[name] = FakeBlob(name)
         return self.blobs[name]
 
+    def list_blobs(self, prefix: str) -> list[FakeBlob]:
+        return [blob for name, blob in self.blobs.items() if name.startswith(prefix)]
+
+    def delete_blobs(self, blobs: list[FakeBlob]) -> None:
+        for blob in blobs:
+            if blob.name in self.blobs:
+                del self.blobs[blob.name]
+
 
 class FakeClient:
     def __init__(self, bucket: FakeBucket) -> None:
@@ -109,6 +117,10 @@ def test_gcs_storage_saves_upload_text_script_and_signed_audio_url() -> None:
         "expiration": timedelta(minutes=15),
         "method": "GET",
     }
+
+    storage.delete_upload("user_1", "file_1")
+    assert "uploads/user_1/file_1/original.txt" not in bucket.blobs
+    assert "uploads/user_1/file_1/extracted.txt" not in bucket.blobs
 
 
 def test_gcs_storage_requires_bucket_name() -> None:

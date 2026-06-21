@@ -50,11 +50,12 @@ class NotebookService:
     def remove_source(self, user_id: str, notebook_id: str, source_id: str) -> None:
         notebook = self.get_notebook(user_id, notebook_id)
         sources = list(notebook.get("sources", []))
-        if source_id in sources:
-            sources.remove(source_id)
-            notebook["sources"] = sources
-            notebook["updated_at"] = utc_now_iso()
-            self.repository.save_notebook(notebook)
+        if source_id not in sources:
+            raise AppError("FILE_NOT_FOUND", "Source not found in this notebook.", status_code=404)
+        sources.remove(source_id)
+        notebook["sources"] = sources
+        notebook["updated_at"] = utc_now_iso()
+        self.repository.save_notebook(notebook)
 
     def add_podcast(self, user_id: str, notebook_id: str, podcast_id: str) -> None:
         notebook = self.get_notebook(user_id, notebook_id)

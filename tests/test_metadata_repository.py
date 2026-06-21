@@ -14,6 +14,8 @@ class MetadataRepository(Protocol):
 
     def list_files(self, user_id: str) -> list[dict]: ...
 
+    def delete_file(self, file_id: str, user_id: str) -> None: ...
+
     def save_script(self, record: dict) -> dict: ...
 
     def get_script(self, script_id: str, user_id: str | None = None) -> dict | None: ...
@@ -127,6 +129,10 @@ def test_metadata_repository_contract(repository: MetadataRepository) -> None:
     assert repository.update_job("job_1", other_user_id, {"status": "failed"}) is None
     assert repository.get_job("job_1", user_id) == updated
     assert repository.list_jobs(user_id) == [updated]
+
+    repository.delete_file("file_1", user_id)
+    assert repository.get_file("file_1", user_id) is None
+    assert repository.list_files(user_id) == []
 
 
 def test_postgres_repository_uses_sync_psycopg_url() -> None:

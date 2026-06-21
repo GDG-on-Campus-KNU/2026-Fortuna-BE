@@ -69,6 +69,21 @@ class LocalStorageService:
             )
         return path.read_text(encoding="utf-8")
 
+    def delete_upload(self, user_id: str, file_id: str) -> None:
+        safe_user_id = self._safe_segment(user_id)
+        upload_dir = self.uploads_dir / safe_user_id / file_id
+        if upload_dir.exists():
+            import shutil
+            try:
+                shutil.rmtree(upload_dir)
+            except OSError as exc:
+                raise AppError(
+                    "STORAGE_DELETE_FAILED",
+                    "Failed to delete uploaded files.",
+                    status_code=500,
+                    detail={"reason": exc.__class__.__name__},
+                ) from exc
+
     def save_script_file(
         self, user_id: str, script_id: str, payload: dict[str, Any]
     ) -> str:

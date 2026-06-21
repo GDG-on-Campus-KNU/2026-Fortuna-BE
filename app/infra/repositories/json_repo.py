@@ -132,6 +132,9 @@ class JsonMetadataRepository:
     def delete_audio(self, audio_id: str, user_id: str) -> None:
         self._delete("audio", "audio_id", audio_id, user_id)
 
+    def delete_file(self, file_id: str, user_id: str) -> None:
+        self._delete("files", "file_id", file_id, user_id)
+
     def _delete(self, collection: str, key: str, key_value: str, user_id: str) -> None:
         with self._lock:
             payload = self._load(collection)

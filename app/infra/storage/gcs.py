@@ -82,6 +82,20 @@ class GCSStorageService:
                 detail={"reason": exc.__class__.__name__},
             ) from exc
 
+    def delete_upload(self, user_id: str, file_id: str) -> None:
+        prefix = self._object_name(user_id, "uploads", file_id) + "/"
+        try:
+            blobs = list(self.bucket.list_blobs(prefix=prefix))
+            if blobs:
+                self.bucket.delete_blobs(blobs)
+        except GoogleAPIError as exc:
+            raise AppError(
+                "STORAGE_DELETE_FAILED",
+                "Failed to delete uploaded files from GCS.",
+                status_code=500,
+                detail={"reason": exc.__class__.__name__},
+            ) from exc
+
     def save_script_file(
         self, user_id: str, script_id: str, payload: dict[str, Any]
     ) -> str:
