@@ -1,6 +1,6 @@
 from app.core.errors import AppError
 from app.domain.audio.schemas import SpeechSpeed, VoiceStyle
-from app.domain.content.schemas import DetailLevel, DurationMinutes, ScriptFormat
+from app.domain.podcast.schemas import DetailLevel, DurationMinutes, ScriptFormat
 from app.domain.job.repository import JobRepository
 from app.domain.records import JobInput, JobRecord
 from app.shared.ids import new_id
@@ -15,6 +15,7 @@ class JobService:
         self,
         user_id: str,
         file_id: str,
+        notebook_id: str,
         duration_minutes: DurationMinutes,
         script_format: ScriptFormat,
         detail_level: DetailLevel,
@@ -32,6 +33,7 @@ class JobService:
         return self.create_job(
             user_id=user_id,
             file_id=file_id,
+            notebook_id=notebook_id,
             filename=file_record["filename"],
             content_type=file_record["content_type"],
             file_size=file_record["size"],
@@ -47,6 +49,7 @@ class JobService:
         self,
         user_id: str,
         file_id: str,
+        notebook_id: str,
         filename: str,
         content_type: str,
         file_size: int,
@@ -61,6 +64,7 @@ class JobService:
         record = JobRecord(
             job_id=new_id("job"),
             user_id=user_id,
+            notebook_id=notebook_id,
             status="pending",
             step="queued",
             progress=0,

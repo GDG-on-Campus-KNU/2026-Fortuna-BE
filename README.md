@@ -90,7 +90,7 @@ docker compose --env-file .env.docker exec postgres psql -U postgres -d fortuna 
 
 API:
 
-- Health: http://localhost:8000/health
+- Health: http://localhost:8000/api/v1/health
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
@@ -110,13 +110,14 @@ docker compose --env-file .env.docker down -v
 
 현재 가능한 흐름:
 
-1. `POST /api/v1/auth/signup`
-2. `POST /api/v1/auth/login`
-3. `POST /uploads`
-4. `POST /jobs`
-5. `GET /jobs/{job_id}`
-
-`/jobs`는 현재 파일 업로드와 job metadata 생성을 수행하며, job은 `pending / queued` 상태로 생성됩니다. 대본 생성, TTS, 최종 콘텐츠 생성 worker는 아직 API 흐름에 연결되어 있지 않습니다.
+1. `POST /api/v1/auth/signup` (회원가입)
+2. `POST /api/v1/auth/login` (로그인)
+3. `POST /api/v1/notebooks` (노트북 생성)
+4. `POST /api/v1/notebooks/{notebook_id}/sources` (노트북에 소스 파일 업로드)
+5. `POST /api/v1/jobs` (팟캐스트 생성 백그라운드 작업 접수)
+6. `GET /api/v1/jobs/{job_id}` (작업 상태 및 진행도 조회)
+7. `GET /api/v1/notebooks/{notebook_id}` (노트북 정보 및 연동된 팟캐스트/소스 리스트 조회)
+8. `GET /api/v1/podcasts` (전체 생성 완료된 팟캐스트 목록 조회)
 
 ## GCS
 
@@ -154,3 +155,39 @@ PowerShell:
 $env:POSTGRES_TEST_DATABASE_URL='postgresql+asyncpg://postgres:postgres@localhost:5432/fortuna'
 uv run python -m pytest tests/test_postgres_integration.py -q
 ```
+
+## Cloud Run 배포
+
+`scripts/deploy.sh`로 로컬에서 Google Cloud Run에 배포합니다.
+
+### 사전 조건
+
+```bash
+# gcloud 로그인 및 프로젝트 설정
+gcloud auth login
+gcloud config set project studycast-46901
+
+# Docker 인증 (처음 한 번만)
+gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+```
+
+### 실행
+
+```bash
+# 빌드 + Push + 배포 (일반 배포)
+./scripts/deploy.sh
+
+# 이미지 빌드·Push만 (배포 제외)
+./scripts/deploy.sh --build-only
+
+# 빌드 없이 현재 latest 이미지로 재배포
+./scripts/deploy.sh --no-build
+```
+
+### 배포 흐름
+
+1. `docker build` — 이미지 빌드 (`GIT_COMMIT` 태그 포함)
+2. `docker push` — Artifact Registry에 Push (`asia-northeast3-docker.pkg.dev/studycast-46901/cloud-run-source-deploy/studycast-be:<sha>`)
+3. `gcloud run deploy` — Cloud Run 새 리비전 배포
+4. `/api/v1/health` 폴링으로 배포 완료 자동 확인
+

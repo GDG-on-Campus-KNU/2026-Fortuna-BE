@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 
-from app.application.content_job_processor import ContentJobProcessor
-from app.core.deps import get_content_job_processor, get_current_user_id, get_job_service
+from app.application.podcast_job_processor import PodcastJobProcessor
+from app.core.deps import get_podcast_job_processor, get_current_user_id, get_job_service
 from app.domain.job.schemas import JobCreateRequest, JobResponse
 from app.domain.job.service import JobService
 
@@ -19,11 +19,12 @@ def create_job(
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user_id),
     job_service: JobService = Depends(get_job_service),
-    processor: ContentJobProcessor = Depends(get_content_job_processor),
+    processor: PodcastJobProcessor = Depends(get_podcast_job_processor),
 ) -> JobResponse:
     record = job_service.create_job_for_file(
         user_id=user_id,
         file_id=request.file_id,
+        notebook_id=request.notebook_id,
         duration_minutes=request.duration_minutes,
         script_format=request.format,
         detail_level=request.detail_level,

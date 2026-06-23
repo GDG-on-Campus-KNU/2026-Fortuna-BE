@@ -2,9 +2,9 @@ from app.core.errors import AppError
 from app.domain.audio.renderer import AudioRenderer
 from app.domain.audio.repository import AudioRepository, AudioStorage
 from app.domain.audio.schemas import AudioRenderOptions, SpeechOptions, SpeechSpeed, VoiceStyle
-from app.domain.content.prompt_builder import PromptBuilder
-from app.domain.content.repository import ContentStorage, LLMClient, ScriptRepository
-from app.domain.content.schemas import DetailLevel, DurationMinutes, ScriptFormat
+from app.domain.podcast.prompt_builder import PromptBuilder
+from app.domain.podcast.repository import PodcastStorage, LLMClient, ScriptRepository
+from app.domain.podcast.schemas import DetailLevel, DurationMinutes, ScriptFormat
 from app.domain.records import AudioRecord, ScriptRecord
 from app.domain.source.repository import SourceRepository
 from app.shared.ids import new_id
@@ -14,7 +14,7 @@ from app.shared.time import utc_now_iso
 class ScriptGenerationService:
     def __init__(
         self,
-        storage: ContentStorage,
+        storage: PodcastStorage,
         source_repository: SourceRepository,
         script_repository: ScriptRepository,
         prompt_builder: PromptBuilder,
@@ -52,10 +52,21 @@ class ScriptGenerationService:
         )
         script = self.llm.generate_script(prompt)
         script_id = new_id("script")
+
+        title = ""
+        try:
+            title = self.llm.generate_title(source_text)
+        except Exception:
+            pass
+        if not title:
+            import os
+            title = os.path.splitext(file_record.get("filename", "무제 팟캐스트"))[0]
+
         options = {
             "duration_minutes": duration_minutes,
             "format": script_format,
             "detail_level": detail_level,
+            "title": title,
         }
         created_at = utc_now_iso()
         storage_payload = {"script": script, "metadata": options}
@@ -131,4 +142,3 @@ class AudioGenerationService:
             created_at=utc_now_iso(),
         )
         return self.audio_repository.save_audio(record.model_dump())
-

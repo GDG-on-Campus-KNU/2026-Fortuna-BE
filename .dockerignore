@@ -18,7 +18,7 @@ __pycache__
 .gcs-key*.json
 
 .secrets
-storage/
+/storage/
 htmlcov
 dist
 build

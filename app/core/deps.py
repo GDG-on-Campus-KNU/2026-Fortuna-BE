@@ -3,14 +3,15 @@ from pathlib import Path
 
 from fastapi import Depends
 
-from app.application.content_job_processor import ContentJobProcessor
-from app.application.generate_content import AudioGenerationService, ScriptGenerationService
+from app.application.podcast_job_processor import PodcastJobProcessor
+from app.application.generate_podcast import AudioGenerationService, ScriptGenerationService
 from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.domain.audio.renderer import AudioRenderer
-from app.domain.content.prompt_builder import PromptBuilder
-from app.domain.content.service import ContentService
+from app.domain.podcast.prompt_builder import PromptBuilder
+from app.domain.podcast.service import PodcastService
+from app.domain.notebook.service import NotebookService
 from app.domain.job.service import JobService
 from app.domain.source.service import SourceService
 from app.infra.llm.gemini import GeminiService
@@ -121,8 +122,8 @@ def get_audio_service() -> AudioGenerationService:
     )
 
 
-def get_content_service() -> ContentService:
-    return ContentService(
+def get_podcast_service() -> PodcastService:
+    return PodcastService(
         repository=get_metadata_repository(),
         audio_url_resolver=get_storage_service(),
     )
@@ -132,12 +133,17 @@ def get_job_service() -> JobService:
     return JobService(repository=get_metadata_repository())
 
 
-def get_content_job_processor() -> ContentJobProcessor:
-    return ContentJobProcessor(
+def get_podcast_job_processor() -> PodcastJobProcessor:
+    return PodcastJobProcessor(
         job_service=get_job_service(),
         script_service=get_script_service(),
         audio_service=get_audio_service(),
+        notebook_service=get_notebook_service(),
     )
+
+
+def get_notebook_service() -> NotebookService:
+    return NotebookService(repository=get_metadata_repository())
 
 
 def reset_dependency_caches() -> None:

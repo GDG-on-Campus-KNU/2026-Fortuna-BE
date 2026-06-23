@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.domain.audio.schemas import SpeechSpeed, VoiceStyle
-from app.domain.content.schemas import DetailLevel, DurationMinutes, ScriptFormat
+from app.domain.podcast.schemas import DetailLevel, DurationMinutes, ScriptFormat
 from app.domain.job.schemas import JobStatus
 
 
@@ -60,6 +60,7 @@ class JobInput(BaseModel):
 class JobRecord(BaseModel):
     job_id: str
     user_id: str
+    notebook_id: str | None = None
     status: JobStatus
     step: str
     progress: int = Field(ge=0, le=100)

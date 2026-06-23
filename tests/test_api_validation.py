@@ -11,7 +11,7 @@ from main import app
 def test_health() -> None:
     client = TestClient(app)
 
-    response = client.get("/health")
+    response = client.get("/api/v1/health")
 
     assert response.status_code == 200
     body = response.json()
@@ -25,9 +25,10 @@ def test_invalid_script_option_returns_consistent_error() -> None:
 
     try:
         response = client.post(
-            "/jobs",
+            "/api/v1/jobs",
             json={
                 "file_id": "file_1",
+                "notebook_id": "nb_1",
                 "duration_minutes": 7,
                 "format": "summary",
                 "detail_level": "normal",
@@ -46,9 +47,10 @@ def test_podcast_api_requires_bearer_token() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/jobs",
+        "/api/v1/jobs",
         json={
             "file_id": "file_1",
+            "notebook_id": "nb_1",
             "duration_minutes": 10,
             "format": "summary",
             "detail_level": "normal",
