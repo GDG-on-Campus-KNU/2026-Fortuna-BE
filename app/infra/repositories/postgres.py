@@ -206,6 +206,9 @@ class PostgresMetadataRepository:
     def delete_audio(self, audio_id: str, user_id: str) -> None:
         self._delete("audio", audio_id, user_id)
 
+    def delete_file(self, file_id: str, user_id: str) -> None:
+        self._delete("files", file_id, user_id)
+
     def _delete(self, collection: str, key_value: str, user_id: str) -> None:
         table, key = TABLES[collection]
         try:

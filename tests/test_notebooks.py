@@ -124,6 +124,17 @@ def test_notebook_operations(tmp_path) -> None:
         detail_response = client.get(f"/api/v1/notebooks/{notebook_id}")
         assert len(detail_response.json()["sources"]) == 0
 
+        # Verify physical files and metadata registry are deleted
+        assert metadata.get_file(source_id, "test-user-id") is None
+        upload_dir = tmp_path / "storage" / "uploads" / "test-user-id" / source_id
+        assert not upload_dir.exists()
+
+        # Trying to remove the same source again should return 404
+        remove_again_res = client.delete(
+            f"/api/v1/notebooks/{notebook_id}/sources/{source_id}"
+        )
+        assert remove_again_res.status_code == 404
+
         # 6. Delete notebook
         delete_notebook_res = client.delete(f"/api/v1/notebooks/{notebook_id}")
         assert delete_notebook_res.status_code == 204

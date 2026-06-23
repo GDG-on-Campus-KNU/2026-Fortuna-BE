@@ -114,5 +114,7 @@ def remove_source(
     source_id: str,
     user_id: str = Depends(get_current_user_id),
     notebook_service: NotebookService = Depends(get_notebook_service),
+    source_service: SourceService = Depends(get_source_service),
 ) -> None:
     notebook_service.remove_source(user_id, notebook_id, source_id)
+    source_service.delete_source(user_id, source_id)
