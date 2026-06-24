@@ -1,9 +1,7 @@
 import io
 import wave
-import pytest
 from unittest.mock import Mock
 
-from app.core.errors import AppError
 from app.domain.audio.renderer import AudioRenderer
 from app.domain.audio.schemas import AudioAsset, AudioRenderOptions, SpeechOptions
 
