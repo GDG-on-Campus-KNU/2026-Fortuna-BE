@@ -11,7 +11,6 @@ from app.core.deps import get_static_audio_dir
 from app.core.errors import register_exception_handlers
 
 
-
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     from app.core.database import Base, engine
@@ -29,8 +28,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
     settings.validate_runtime_settings()
     application = FastAPI(
-        title="Fortuna API",
-        description="2026 Fortuna Backend API",
+        title="Studycast API",
+        description="2026 Studycast Backend API",
         lifespan=lifespan,
     )
 

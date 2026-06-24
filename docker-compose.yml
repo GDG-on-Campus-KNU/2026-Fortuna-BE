@@ -1,10 +1,10 @@
-name: fortuna
+name: studycast
 
 services:
   api:
     build:
       context: .
-    image: fortuna-api:local
+    image: studycast-api:local
     init: true
     ports:
       - "${API_PORT:-8000}:8000"
@@ -50,7 +50,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).read()",
         ]
       interval: 10s
       timeout: 3s
