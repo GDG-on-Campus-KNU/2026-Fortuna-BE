@@ -53,7 +53,7 @@ def get_notebook(
     )
 
 
-@router.post("/notebooks", response_model=NotebookResponse, status_code=201)
+@router.post("/notebooks", response_model=NotebookResponse, status_code=status.HTTP_201_CREATED)
 def create_notebook(
     request: NotebookCreateRequest,
     user_id: str = Depends(get_current_user_id),
@@ -69,7 +69,7 @@ def create_notebook(
     )
 
 
-@router.delete("/notebooks/{notebook_id}", status_code=204)
+@router.delete("/notebooks/{notebook_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_notebook(
     notebook_id: str,
     user_id: str = Depends(get_current_user_id),

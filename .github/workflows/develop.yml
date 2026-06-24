@@ -80,7 +80,7 @@ jobs:
         run: uv run python -m compileall main.py app
 
       - name: Verify FastAPI app import
-        run: uv run python -c "from main import app; assert app.title == 'Fortuna API'; print(app.title)"
+        run: uv run python -c "from main import app; assert app.title == 'Studycast API'; print(app.title)"
 
       - name: Run tests
         run: uv run python -m pytest -q
@@ -138,7 +138,7 @@ jobs:
           echo "Waiting for /health..."
           ok=""
           for i in $(seq 1 30); do
-            body="$(curl -fsS --max-time 5 http://localhost:8000/health 2>/dev/null || true)"
+            body="$(curl -fsS --max-time 5 http://localhost:8000/api/v1/health 2>/dev/null || true)"
             status="$(printf '%s' "${body}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)"
             echo "  attempt ${i}: status=${status:-<unreachable>}"
             if [ "${status}" = "ok" ]; then ok=1; break; fi
@@ -228,7 +228,7 @@ jobs:
             echo "::error::RENDER_SERVICE_URL variable is not set; cannot verify the deploy."
             exit 1
           fi
-          url="${SERVICE_URL%/}/health"
+          url="${SERVICE_URL%/}/api/v1/health"
           echo "Waiting for ${url} to report commit ${EXPECTED_SHA} ..."
           deadline=$(( SECONDS + 600 ))
           while [ "${SECONDS}" -lt "${deadline}" ]; do
