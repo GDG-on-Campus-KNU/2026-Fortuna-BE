@@ -1,3 +1,6 @@
+![Light Logo](https://github.com/user-attachments/assets/4d692da2-66cb-4751-9360-3611b9ade797#gh-light-mode-only)
+![Dark Logo](https://github.com/user-attachments/assets/90ea1b34-0343-404b-a54b-94e7c1bd460d#gh-dark-mode-only)
+
 # Studycast Backend
 
 **Studycast Frontend** → [GitHub](https://github.com/GDG-on-Campus-KNU/2026-Fortuna-FE)
@@ -5,6 +8,10 @@
 > **이동 중 낭비되는 시간을 공부 시간으로 바꾸는, AI 팟캐스트 학습 앱**
 >
 > 사용자의 가용 시간과 선호 스타일에 맞춰 학습 자료를 맞춤형 팟캐스트와 암기송으로 변환해 주는 AI 기반 개인화 오디오 학습 솔루션.
+
+| 홈 | 라이브러리 | 파일 | 플레이어 |
+| --- | --- | --- | --- |
+| ![홈](https://github.com/user-attachments/assets/a837287f-6274-44b4-a8ad-e50fd2bff0f9) | ![라이브러리](https://github.com/user-attachments/assets/603939dd-2b6b-4adb-82a8-674bdf469987) | ![파일](https://github.com/user-attachments/assets/e3d49d5d-b3f0-40eb-85ab-31d92677e6c7) | ![플레이어](https://github.com/user-attachments/assets/2ecd23d7-e4b6-4b12-9367-45cdc0a06652) |
 
 ## 주요 기능
 
@@ -45,26 +52,11 @@
 └── tests/                  # 단위 및 통합 테스트 코드 폴더
 ```
 
-## 아키텍처
+## 시스템 아키텍처
 
-본 프로젝트는 유지 보수성과 관심사 분리(SoC)를 극대화하기 위해 클린/레이어드 아키텍처(Clean/Layered Architecture) 구조를 따르고 있습니다.
-
-```mermaid
-graph TD
-    Client[Client App] -->|HTTP Request| API[API Layer: app/api]
-    API -->|DI & Scenario Call| Service[Application Service: app/services]
-    Service -->|Entities & Rules| Domain[Domain Layer: app/domain]
-    Service -->|External Integration| Infra[Infrastructure Layer: app/infra]
-    Infra -->|Read / Write| DB[(PostgreSQL)]
-    Infra -->|Read / Write| GCS[(Google Cloud Storage)]
-    Infra -->|LLM / Prompt| Gemini[Google Gemini LLM]
-    Infra -->|TTS / Audio| TTS[Google Cloud TTS]
-```
-
-- **API Layer (`app/api/`)**: HTTP 요청 및 응답 처리, 라우팅 정의, Pydantic 스키마 검증, 그리고 사용자 인증/인가 의존성 주입을 담당합니다.
-- **Application Service Layer (`app/services/` & `app/application/`)**: 비즈니스 시나리오 유스케이스를 구현하고, Gemini AI 스크립트 작성 및 TTS 오디오 믹싱 등 백그라운드 태스크(`PodcastJobProcessor`)의 실행 흐름을 제어합니다.
-- **Domain Layer (`app/domain/`)**: 시스템의 비즈니스 규칙과 엔티티 모델(Pydantic Record), 핵심 도메인 인터페이스를 관리합니다.
-- **Infrastructure Layer (`app/infra/`)**: PostgreSQL, GCS, Gemini LLM API, Google Cloud TTS 등 외부 서비스 및 데이터베이스 저장소(Repository)의 기술적 구현 세부사항을 담당합니다.
+<p align="center">
+    <img width="512" alt="Studycast-System-Architecture" src="https://github.com/user-attachments/assets/b032f8ed-b6a4-4cc7-b065-7849f393bd2d" />
+</p>
 
 ## ERD
 
@@ -156,10 +148,10 @@ erDiagram
 
 프로젝트의 자세한 설정 및 사용 안내는 아래 문서들을 참고하세요.
 
-- 🚀 [Getting Started Guide](docs/getting-started.md) — 로컬 개발 환경 구성, 환경 변수 설정, Docker Compose 실행 및 테스트 방법
-- 🔌 [API Reference & Flow](docs/api.md) — 전체 API 흐름 시나리오 및 API 문서 연동 정보
-- 🗄️ [Google Cloud Storage Design](docs/gcs.md) — GCS 내 폴더 구조 규격 및 Signed URL 만료 정책
-- ☁️ [Cloud Run Deployment Guide](docs/deployment.md) — Google Cloud Run 배포 사전 준비 및 스크립트 실행 방법
+- [Getting Started Guide](docs/getting-started.md) — 로컬 개발 환경 구성, 환경 변수 설정, Docker Compose 실행 및 테스트 방법
+- [API Reference & Flow](docs/api.md) — 전체 API 흐름 시나리오 및 API 문서 연동 정보
+- [Google Cloud Storage Design](docs/gcs.md) — GCS 내 폴더 구조 규격 및 Signed URL 만료 정책
+- [Cloud Run Deployment Guide](docs/deployment.md) — Google Cloud Run 배포 사전 준비 및 스크립트 실행 방법
 
 ## Team Fortuna
 
