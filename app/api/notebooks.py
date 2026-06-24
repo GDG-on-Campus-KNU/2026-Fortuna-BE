@@ -99,13 +99,34 @@ async def upload_source(
         content=content,
     )
     notebook_service.add_source(user_id, notebook_id, file_record)
-    return SourceResponse(
-        id=file_record["file_id"],
-        name=file_record["filename"],
-        type="PDF" if file_record["content_type"] == "application/pdf" else "txt",
-        created_at=file_record["created_at"],
-        updated_at=file_record.get("updated_at") or file_record["created_at"],
-    )
+    return _source_response(file_record)
+
+
+@router.post(
+    "/notebooks/{notebook_id}/sources/batch",
+    response_model=list[SourceResponse],
+    status_code=201,
+)
+async def upload_sources_batch(
+    notebook_id: str,
+    files: list[UploadFile] = File(...),
+    user_id: str = Depends(get_current_user_id),
+    notebook_service: NotebookService = Depends(get_notebook_service),
+    source_service: SourceService = Depends(get_source_service),
+    settings: Settings = Depends(get_settings),
+) -> list[SourceResponse]:
+    uploaded: list[SourceResponse] = []
+    for file in files:
+        content = await file.read(settings.max_upload_bytes + 1)
+        file_record = source_service.upload_and_extract(
+            user_id=user_id,
+            filename=file.filename,
+            content_type=file.content_type,
+            content=content,
+        )
+        notebook_service.add_source(user_id, notebook_id, file_record)
+        uploaded.append(_source_response(file_record))
+    return uploaded
 
 
 @router.delete("/notebooks/{notebook_id}/sources/{source_id}", status_code=204)
@@ -118,3 +139,13 @@ def remove_source(
 ) -> None:
     notebook_service.remove_source(user_id, notebook_id, source_id)
     source_service.delete_source(user_id, source_id)
+
+
+def _source_response(file_record: dict) -> SourceResponse:
+    return SourceResponse(
+        id=file_record["file_id"],
+        name=file_record["filename"],
+        type="PDF" if file_record["content_type"] == "application/pdf" else "txt",
+        created_at=file_record["created_at"],
+        updated_at=file_record.get("updated_at") or file_record["created_at"],
+    )
