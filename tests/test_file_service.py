@@ -55,6 +55,55 @@ def test_txt_upload_extracts_text(tmp_path: Path) -> None:
     assert "id" in body
 
 
+def test_batch_txt_upload_adds_multiple_sources_to_notebook(tmp_path: Path) -> None:
+    metadata = JsonMetadataRepository(tmp_path / "metadata")
+    settings = Settings(
+        app_env="test",
+        local_storage_dir=str(tmp_path / "storage"),
+        metadata_dir=str(tmp_path / "metadata"),
+        _env_file=None,
+    )
+    storage = LocalStorageService(settings)
+    source_service = SourceService(settings, storage, metadata, PDFExtractor())
+    notebook_service = NotebookService(metadata)
+
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
+    app.dependency_overrides[get_source_service] = lambda: source_service
+    app.dependency_overrides[get_notebook_service] = lambda: notebook_service
+    client = TestClient(app)
+
+    try:
+        nb_res = client.post(
+            "/api/v1/notebooks",
+            json={"title": "Operating Systems"},
+        )
+        assert nb_res.status_code == 201
+        notebook_id = nb_res.json()["id"]
+
+        response = client.post(
+            f"/api/v1/notebooks/{notebook_id}/sources/batch",
+            files=[
+                ("files", ("week1.txt", b"Process scheduling.", "text/plain")),
+                ("files", ("week2.txt", b"Deadlock prevention.", "text/plain")),
+            ],
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    body = response.json()
+    assert [item["name"] for item in body] == ["week1.txt", "week2.txt"]
+    assert all(item["type"] == "txt" for item in body)
+
+    notebook = metadata.get_notebook(notebook_id, "test-user-id")
+    assert notebook is not None
+    assert notebook["sources"] == [item["id"] for item in body]
+    assert {record["filename"] for record in metadata.list_files("test-user-id")} == {
+        "week1.txt",
+        "week2.txt",
+    }
+
+
 def test_invalid_file_type_returns_error(tmp_path: Path) -> None:
     metadata = JsonMetadataRepository(tmp_path / "metadata")
     notebook_service = NotebookService(metadata)
