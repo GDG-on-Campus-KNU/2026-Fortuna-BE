@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 from app.core.errors import AppError
 from app.domain.audio.renderer import AudioRenderer
-from app.domain.audio.schemas import AudioAsset, AudioRenderOptions, SpeechOptions, MusicOptions
+from app.domain.audio.schemas import AudioAsset, AudioRenderOptions, SpeechOptions
 
 
 def make_mock_wav(n_frames: int = 100) -> bytes:
